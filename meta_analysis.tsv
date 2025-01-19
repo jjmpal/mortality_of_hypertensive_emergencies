@@ -1,0 +1,39 @@
+Filename	Reason for exlusion	Exclude	Author	Population	Outcome
+Association between B-type natriuretic peptide and long-term mortality in patients with acute severe hypertension visiting the emergency department.pdf	"Cox with ProBNP, only aHR"	TRUE			
+Association between D-dimer and long-term mortality in patients with acute severe hypertension visiting the emergency department.pdf	"Cox with FIDD, only aHR"	TRUE			
+Association between hypertensive urgencies and subsequent cardiovascular events in patients with hypertension.pdf	Wrong outcome	TRUE	Vlcek	"Vienna, Austria"	Cardiovascrular event
+Association of anaemia with long-term mortality among patients with hypertensive crisis in the emergency department.pdf	"Cox with anemia, only aHR"	TRUE			
+Association of microscopic hematuria with long-term mortality.pdf	"Cox with hematuria, only aHR"	TRUE			
+Burden of Hypertensive Crisis in Patients With End-Stage Kidney Disease on Maintenance Dialysis.pdf	Too few digits	TRUE			
+Cardiovascular prognosis in patients admitted to an emergency department with hypertensive emergencies and urgencies (3).pdf		TRUE	Paini	"Brescia, Italy"	Cardiovascular fatal and nonfatal events
+Characteristics and Outcomes of Patients Presenting With Hypertensive Urgency.pdf	Too complex outcome	TRUE	Mancusi	"Naples, Italy"	"Composite event of fatal and nonfatal stroke and myocardial infarction, sudden cardiac death, carotid stenting, heart failure requiring hospitalization, Transient ischemic attack, de novo
+angina, myocardial revascularization, and atrial fibrillation."
+Characteristics and Prognosis of Patients With Hypertensive Encephalopathy A French Nationwide Cohort Study.pdf	Encephalopathy	TRUE			
+Clinical Characteristics and Predictors of All-Cause Mortality in Patients with Hypertensive Urgency at an Emergency Department.pdf		FALSE	Shin	"Gyeonggi-do, Korea"	All-cause mortality
+Clinical characteristics and outcomes of a patient population.pdf	ESKD	TRUE			
+Clinical implications of cardiac troponin-I in patients with hypertensive crisis visiting the emergency department.pdf	"Cox with TnI, only aHR"	TRUE			
+Clinical value of multiorgan damage in hypertensive crises A prospective follow-up study.pdf	"subgroups, no mortality data"	TRUE			
+Clinico-pathological characteristics and outcomes of patients with biopsy-proven hypertensive nephrosclerosis a retrospective cohort study.pdf	no mortality data	TRUE			
+Does obesity influence target organ damage and outcomes in patients with malignant phase hypertension The West Birmingham Malignant Hypertension Project.pdf	same data as in Lane	TRUE	Shantsila	"Birmingham, UK"	
+Effect of intravenous antihypertensives on outcomes of severe hypertension in hospitalized patients without acute target organ damage.pdf	treatment	TRUE			
+Elevated blood pressure during emergency departments visit is associated with increased rate of hospitalization for heart failure A retrospective cohort study.pdf	no suitable data	TRUE			
+Elevated troponin predicts long-term adverse cardiovascular outcomes in hypertensive crisis a retrospective study.pdf	no mortality data	TRUE			
+Hypertensive Urgency in Tanzanian Adults A 1-Year Prospective Study.pdf		FALSE	Reis	"Mwanza, Tanzania"	Hospital admission or death
+Hypertensive crises in sub-Saharan Africa Clinical profile and short-term outcome in the medical emergencies department of a national referral hospital in Burkina Faso.pdf	missing data	TRUE			
+Impact of hypertensive emergency and rare complement variants on the presentation and outcome of atypical hemolytic uremic syndrome.pdf	no data	TRUE			
+Impact of the estimated glomerular filtration rate on long-term mortality in patients with hypertensive crisis visiting the emergency department.pdf	HR by kidney; only aHR	TRUE			
+Impact of underweight on 3-year all-cause mortality in patients with acute severe hypertension a retrospective cohort study.pdf	"HR for obesity, only subgroup data; same data as with Shin"	TRUE	Kim	"Gyeonggi-do, Korea"	
+Improving survival of malignant hypertension patients over 40 years.pdf		FALSE	Lane	"Birmingham, UK"	Death
+"In-hospital outcomes of patients with a hypertensive emergency at a medical center, Ethiopia A prospective observational study.pdf"		FALSE	Yizengaw	"Jimma, Ethiopia"	In hospital mortality
+Lack of impact of pulse pressure on outcomes in patients with malignant phase hypertension the West Birmingham Malignant Hypertension study.pdf	same data as in Lane	TRUE	Shantsila	"Birmingham, UK"	
+Long-term renal outcome in patients with malignant hypertension a retrospective cohort study.pdf	Mortality; no relavent data	TRUE			
+Long-term renal survival in malignant hypertension.pdf	no longitudinal	TRUE			
+Malignant Hypertension in Patients with Idiopathic IgA Nephropathy.pdf	IgA Nephropathy	TRUE			
+Outcomes after hypertensive crisis Comparison between diabetics and nondiabetics.pdf	no data	TRUE			
+Pharmacological blood pressure control and outcomes in patients with hypertensive crisis discharged from the emergency department.pdf	Only aHR	TRUE			
+Risk Factors Promoting Hypertensive Crises.pdf	Factors associated with HE	TRUE			
+Safety and Efficacy of Aliskiren Amlodipine Hydrochlorothiazide Triple.pdf	no data	TRUE			
+Sex-related cardiovascular prognosis in patients with hypertensive emergencies a 12-month study.pdf	few deaths	TRUE			
+The Vascular-Renal Connection in Patients Hospitalized With Hypertensive Crisis A Population-Based Study.pdf	no data	TRUE			
+Thirty-Day Readmission Rate Among Patients With Hypertensive Crisis A Nationwide Analysis.pdf	no data	TRUE			
+"Prevalence, determinants, and clinical significance of cardiac troponin-I elevation in individuals admitted for a hypertensive emergency.pdf"		FALSE	Alfonso	"Detroit and Michigan, USA"	Mortality

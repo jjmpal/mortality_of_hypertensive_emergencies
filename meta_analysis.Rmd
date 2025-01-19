@@ -1,0 +1,181 @@
+---
+title: "Hypertensive emergency meta-analysis"
+author: "Joonatan Palmu"
+date: "`r format(Sys.time(), '%d.%m.%Y')`"
+output:
+    rmdformats::html_clean:
+        self_contained: true
+        thumbnails: false
+        lightbox: true
+        gallery: true
+---
+
+# Init
+
+```{r options, echo = FALSE}
+knitr::opts_chunk$set(include = TRUE, echo = TRUE, message = FALSE, cache=FALSE, warning=FALSE)
+```
+
+## Libraries
+
+```{css, echo = FALSE}
+.main-container {
+  max-width:1920px !important;
+}
+
+table {
+  width: 100% !important;
+}
+
+th:not(:first-child) {
+  text-align:right !important;
+}
+```
+
+```{r, echo = FALSE}
+library(magrittr)
+```
+
+# Data definitions
+
+## Systolic BP
+
+```{r, echo = FALSE}
+df_bp <- tibble::tibble(study = c("Shin et al. (2021)",
+                                  "Reis et al. (2020)",
+                                  "Lane et al. (2009)"),
+                        HR = c(1.01,
+                               1.42^0.1,
+                               1.001),
+                        conf_low = c(1.01,
+                                     1.24^0.1,
+                                     0.996),
+                        conf_high = c(1.02,
+                                      1.62^0.1,
+                                      1.006)) %>%
+  dplyr::mutate(dplyr::across(c(HR, conf_low, conf_high), ~.^10)) %>% 
+  dplyr::mutate(SE = (conf_high - conf_low) / (2 * 1.96),
+                logHR = log(HR))
+```
+
+```{r, echo = FALSE}
+df_bp %>% knitr::kable()
+```
+
+## Age
+
+```{r, echo = FALSE}
+df_age <- tibble::tibble(study = c("Afonso et al. (2011)",
+                                   "Lane et al. (2009)",
+                                   "Yizengaw et al. (2022)"),
+                         HR = c(1.025,
+                                1.04,
+                                1.016),
+                         conf_low = c(1.016,
+                                      1.03,
+                                      0.969),
+                         conf_high = c(1.034,
+                                       1.05,
+                                       1.065)) %>%
+  dplyr::mutate(dplyr::across(c(HR, conf_low, conf_high), ~.^10)) %>% 
+  dplyr::mutate(SE = (conf_high - conf_low) / (2 * 1.96),
+                logHR = log(HR))
+```
+
+```{r, echo = FALSE}
+df_age %>% knitr::kable()
+```
+
+## Male
+
+```{r, echo = FALSE}
+df_sex <- tibble::tibble(study = c("Shin et al. (2021)",
+                                   "Reis et al. (2020)",
+                                   "Lane el al. (2009)"),
+                         HR = c(1.54,
+                                1/0.97,
+                                0.95),
+                         conf_low = c(1.22,
+                                      1/1.72,
+                                      0.65),
+                         conf_high = c(1.94,
+                                       1/0.55,
+                                       1.41)) %>%
+  dplyr::mutate(SE = (conf_high - conf_low) / (2 * 1.96),
+                logHR = log(HR))
+```
+
+```{r, echo = FALSE}
+df_sex %>% knitr::kable()
+```
+
+
+# Random-effects meta-analysis
+
+## Systolic BP
+
+```{r}
+metafor::rma(yi = logHR, sei = SE, data = df_bp, method = "REML") %>%
+  summary()
+```
+
+## Age
+
+```{r}
+metafor::rma(yi = logHR, sei = SE, data = df_age, method = "REML") %>%
+  summary()
+```
+
+## Men
+
+```{r}
+metafor::rma(yi = logHR, sei = SE, data = df_sex, method = "REML") %>%
+  summary()
+```
+
+# Forest plot
+
+```{r}
+df_age_meta <- metafor::rma(yi = logHR, sei = SE, data = df_age, method = "REML") %>%
+  broom::tidy(conf.int = TRUE) %>%
+  dplyr::select(HR = estimate, conf_low = conf.low, conf_high = conf.high) %>%
+  dplyr::mutate(dplyr::across(c(HR, conf_low, conf_high), exp)) %>%
+  dplyr::mutate(study = "Overall")
+```
+
+```{r, echo = FALSE}
+forest.data.summary <- dplyr::bind_rows(df_age, df_age_meta) %>% 
+  dplyr::mutate_if(is.numeric, round, 2) %>%
+  dplyr::mutate(label = glue::glue("{format(HR, 2)} ({format(conf_low, 2)}-{format(conf_high, 2)})")) %>%
+  dplyr::mutate(study = stringr::str_replace_all(study, ".et.al..", " et al. ")) 
+```
+
+```{r, echo = FALSE}
+png(width = 2000, height = 1200, res = 300, file = "cache/forest_age.png")
+forestplot::forestplot(
+              labeltext = cbind(forest.data.summary$study %>% as.character(),
+                                forest.data.summary$label),
+              mean = forest.data.summary$HR,
+              lower = forest.data.summary$conf_low,
+              upper = forest.data.summary$conf_high,
+              align = c("l", "l", "l"),
+              graph.pos = 2,
+              title = "",
+              xlog = FALSE,
+              xlab = "HR (95% CI) per 10-year increase in age",
+              is.summary = c(rep(FALSE, nrow(forest.data.summary)-1), TRUE),
+              txt_gp = forestplot::fpTxtGp(label = grid::gpar(cex = 1.25),
+                               ticks = grid::gpar(cex = 1.1),
+                               xlab = grid::gpar(cex = 1.2),
+                               title = grid::gpar(cex = 1.2)),
+              xticks = seq(0.5, 2.0, 0.5),
+              clip =c(0.9, 1.5),
+              zero = 1,
+              lineheight = grid::unit(10, "mm"),
+              boxsize = 0.15,
+              colgap = grid::unit(4, "mm"),
+              lwd.ci = 1)
+dev.off()
+```
+
+<img src = "cache/forest_age.png" />
