@@ -36,6 +36,20 @@ th:not(:first-child) {
 library(magrittr)
 ```
 
+## Ggplot2
+
+```{r}
+{ ggthemes::theme_tufte(base_family = "sans", base_size = 12) +
+    ggplot2::theme(axis.text = ggplot2::element_text(colour = "black", size = 10),
+                   panel.border = ggplot2::element_rect(colour = "black", fill = NA),
+                   panel.background = ggplot2::element_rect(fill = "white", colour = "white"),
+                   plot.background = ggplot2::element_rect(fill = "white", colour = "white")) } %>%
+  ggplot2::theme_set()
+```
+
+```
+
+
 # Data definitions
 
 ## Systolic BP
@@ -136,46 +150,152 @@ metafor::rma(yi = logHR, sei = SE, data = df_sex, method = "REML") %>%
 # Forest plot
 
 ```{r}
-df_age_meta <- metafor::rma(yi = logHR, sei = SE, data = df_age, method = "REML") %>%
-  broom::tidy(conf.int = TRUE) %>%
-  dplyr::select(HR = estimate, conf_low = conf.low, conf_high = conf.high) %>%
-  dplyr::mutate(dplyr::across(c(HR, conf_low, conf_high), exp)) %>%
-  dplyr::mutate(study = "Overall")
+make_plot <- function(df, xlab = "HR (95% CI)") {
+  df_meta <- metafor::rma(yi = logHR, sei = SE, data = df, method = "REML") %>%
+    broom::tidy(conf.int = TRUE) %>%
+    dplyr::select(HR = estimate, conf_low = conf.low, conf_high = conf.high) %>%
+    dplyr::mutate(dplyr::across(c(HR, conf_low, conf_high), exp)) %>%
+    dplyr::mutate(study = "Overall")
+
+  df_plot <- dplyr::bind_rows(df, df_meta) %>% 
+    dplyr::mutate_if(is.numeric, round, 2) %>%
+    dplyr::mutate(label = glue::glue("{format(HR, 2)} ({format(conf_low, 2)}-{format(conf_high, 2)})")) %>%
+    dplyr::mutate(study = stringr::str_replace_all(study, ".et.al..", " et al. ")) 
+
+  forestplot::forestplot(labeltext = cbind(df_plot$study %>% as.character(), df_plot$label),
+                         mean = df_plot$HR,
+                         lower = df_plot$conf_low,
+                         upper = df_plot$conf_high,
+                         align = c("l", "l", "l"),
+                         graph.pos = 2,
+                         title = "",
+                         xlog = FALSE,
+                         xlab = xlab,
+                         is.summary = c(rep(FALSE, nrow(df_plot)-1), TRUE),
+                         txt_gp = forestplot::fpTxtGp(label = grid::gpar(cex = 1.25),
+                                                      ticks = grid::gpar(cex = 1.1),
+                                                      xlab = grid::gpar(cex = 1.2),
+                                                      title = grid::gpar(cex = 1.2)),
+                         xticks = seq(0.5, 2.0, 0.5),
+                         clip =c(0.9, 1.5),
+                         zero = 1,
+                         lineheight = grid::unit(10, "mm"),
+                         boxsize = 0.15,
+                         colgap = grid::unit(4, "mm"),
+                         lwd.ci = 1) %>%
+    print() %>% 
+    grid::grid.grabExpr()
+}
 ```
 
-```{r, echo = FALSE}
-forest.data.summary <- dplyr::bind_rows(df_age, df_age_meta) %>% 
-  dplyr::mutate_if(is.numeric, round, 2) %>%
-  dplyr::mutate(label = glue::glue("{format(HR, 2)} ({format(conf_low, 2)}-{format(conf_high, 2)})")) %>%
-  dplyr::mutate(study = stringr::str_replace_all(study, ".et.al..", " et al. ")) 
+```{r}
+cowplot::plot_grid(make_plot(df_age, xlab = "HR (95% CI) per 10-year increase in age"),
+                   make_plot(df_bp, xlab = "HR (95% CI) per 10 mmHg increase in blood pressure"),
+                   make_plot(df_sex),
+                   ncol = 1,
+                   hjust = 0,
+                   labels = c("A. Age",
+                              "B. Systolic blood pressure",
+                              "C. Male sex")) %>%
+  ggplot2::ggsave("cache/forest.png",
+                  plot = .,
+                  width = 6,
+                  height = 10,
+                  unit = "in",
+                  dpi = 300)
 ```
 
-```{r, echo = FALSE}
-png(width = 2000, height = 1200, res = 300, file = "cache/forest_age.png")
-forestplot::forestplot(
-              labeltext = cbind(forest.data.summary$study %>% as.character(),
-                                forest.data.summary$label),
-              mean = forest.data.summary$HR,
-              lower = forest.data.summary$conf_low,
-              upper = forest.data.summary$conf_high,
-              align = c("l", "l", "l"),
-              graph.pos = 2,
-              title = "",
-              xlog = FALSE,
-              xlab = "HR (95% CI) per 10-year increase in age",
-              is.summary = c(rep(FALSE, nrow(forest.data.summary)-1), TRUE),
-              txt_gp = forestplot::fpTxtGp(label = grid::gpar(cex = 1.25),
-                               ticks = grid::gpar(cex = 1.1),
-                               xlab = grid::gpar(cex = 1.2),
-                               title = grid::gpar(cex = 1.2)),
-              xticks = seq(0.5, 2.0, 0.5),
-              clip =c(0.9, 1.5),
-              zero = 1,
-              lineheight = grid::unit(10, "mm"),
-              boxsize = 0.15,
-              colgap = grid::unit(4, "mm"),
-              lwd.ci = 1)
-dev.off()
+<img src = "cache/forest.png" />
+
+# Incidence
+
+```{r}
+df_incidence <- readr::read_tsv("incidence.tsv")
 ```
 
-<img src = "cache/forest_age.png" />
+## Study rates
+
+```{r}
+myrate <- function(df, outcome) {
+  meta_result <- df_incidence %>%
+    dplyr::rename(N = !!glue::glue("{outcome}_N"),
+                  events = !!glue::glue("{outcome}_deaths")) %>% 
+    dplyr::select(Study, followup, N, events) %>%
+    dplyr::mutate(person_time = followup*N) %>%
+    tidyr::drop_na() %>% 
+    meta::metarate(event = events, time = person_time, studlab = Study, data = .)
+
+  tibble::tibble(rate = meta_result$TE) %>%
+    dplyr::mutate(dplyr::across(c(rate), exp))
+}
+```
+
+```{r}
+df_rate <- c("HTNC", "HTNU", "HTNE") %>%
+  setNames(., .) %>%
+  purrr::map_df(~myrate(df_incidence, .x), .id = "type") %>%
+  dplyr::mutate(type = factor(type, levels = c("HTNC", "HTNU", "HTNE"))) %>%
+  dplyr::mutate(type = forcats::fct_recode(type,
+                                           "Hypertensive crisis" = "HTNC",
+                                           "Hypertensive urgency" = "HTNU",
+                                           "Hypertensive emergency" = "HTNE"))
+```
+
+## Meta-analysis for incidence rates
+
+
+```{r}
+mymetarate <- function(df, outcome) {
+  meta_result <- df_incidence %>%
+    dplyr::rename(N = !!glue::glue("{outcome}_N"),
+                  events = !!glue::glue("{outcome}_deaths")) %>% 
+    dplyr::select(Study, followup, N, events) %>%
+    dplyr::mutate(person_time = followup*N) %>%
+    tidyr::drop_na() %>% 
+    meta::metarate(event = events, time = person_time, studlab = Study, data = .)
+  
+  tibble::tibble(method = c("Fixed effect", "Random effects"),
+                 rate = c(meta_result$TE.common, meta_result$TE.random),
+                 lower_ci = c(meta_result$lower.common, meta_result$lower.random),
+                 upper_ci = c(meta_result$upper.common, meta_result$upper.random),
+                 I2 = rep(meta_result$I2, 2)) %>%
+    dplyr::mutate(dplyr::across(c(rate, lower_ci, upper_ci), exp))
+}
+
+```
+
+```{r}
+df_metarate <- c("HTNC", "HTNU", "HTNE") %>%
+  setNames(., .) %>%
+  purrr::map_df(~mymetarate(df_incidence, .x), .id = "type") %>%
+  dplyr::filter(method == "Random effects") %>%
+  dplyr::select(-method) %>%
+  dplyr::mutate(type = factor(type, levels = c("HTNC", "HTNU", "HTNE"))) %>%
+  dplyr::mutate(type = forcats::fct_recode(type,
+                                           "Hypertensive crisis" = "HTNC",
+                                           "Hypertensive urgency" = "HTNU",
+                                           "Hypertensive emergency" = "HTNE"))
+```
+
+```{r}
+df_metarate %>% knitr::kable()
+df_rate
+```
+
+## Plot
+
+```{r}
+{ ggplot2::ggplot(df_metarate, ggplot2::aes(x = forcats::fct_rev(type), y = rate)) +
+    ggplot2::geom_jitter(data = df_rate, size = 4, width = 0.3, alpha = 0.4, stroke=NA) +
+    ggplot2::geom_point(size = 8, shape = 18) +
+    ggplot2::geom_errorbar(ggplot2::aes(ymin = lower_ci, ymax = upper_ci), width = 0.1, size = 0.5) +
+    ggplot2::coord_flip() +
+    ggplot2::scale_x_discrete(name = NULL, expand = c(0, 0.4)) +
+    ggplot2::scale_y_continuous(name = "Annual mortality rate (95% CI)",
+                                expand = c(0, 0),
+                                breaks = seq(0, 1, 0.1),
+                                limits = c(0, 0.42)) } %>%
+  ggplot2::ggsave(filename = "cache/incidence.png", width = 8, height = 6, dpi = 300)
+```
+
+<img src = "cache/incidence.png" />
