@@ -210,14 +210,15 @@ cowplot::plot_grid(make_plot(df_age, xlab = "HR (95% CI) per 10-year increase in
 # Incidence
 
 ```{r}
-df_incidence <- readr::read_tsv("incidence.tsv")
+df_incidence <- readr::read_tsv("incidence.tsv") %>%
+    dplyr::arrange(Study)
 ```
 
 ## Study rates
 
 ```{r}
 myrate <- function(df, outcome) {
-  meta_result <- df_incidence %>%
+  meta_result <- df %>%
     dplyr::rename(N = !!glue::glue("{outcome}_N"),
                   events = !!glue::glue("{outcome}_deaths")) %>% 
     dplyr::select(Study, followup, N, events) %>%
@@ -225,7 +226,10 @@ myrate <- function(df, outcome) {
     tidyr::drop_na() %>% 
     meta::metarate(event = events, time = person_time, studlab = Study, data = .)
 
-  tibble::tibble(rate = meta_result$TE) %>%
+  tibble::tibble(study = meta_result$studlab,
+                 event = meta_result$event,
+                 time = meta_result$time,
+                 rate = meta_result$TE) %>%
     dplyr::mutate(dplyr::across(c(rate), exp))
 }
 ```
@@ -234,11 +238,7 @@ myrate <- function(df, outcome) {
 df_rate <- c("HTNC", "HTNU", "HTNE") %>%
   setNames(., .) %>%
   purrr::map_df(~myrate(df_incidence, .x), .id = "type") %>%
-  dplyr::mutate(type = factor(type, levels = c("HTNC", "HTNU", "HTNE"))) %>%
-  dplyr::mutate(type = forcats::fct_recode(type,
-                                           "Hypertensive crisis" = "HTNC",
-                                           "Hypertensive urgency" = "HTNU",
-                                           "Hypertensive emergency" = "HTNE"))
+  dplyr::mutate(lower_ci = rate, upper_ci = rate)
 ```
 
 ## Meta-analysis for incidence rates
@@ -246,7 +246,7 @@ df_rate <- c("HTNC", "HTNU", "HTNE") %>%
 
 ```{r}
 mymetarate <- function(df, outcome) {
-  meta_result <- df_incidence %>%
+  meta_result <- df %>%
     dplyr::rename(N = !!glue::glue("{outcome}_N"),
                   events = !!glue::glue("{outcome}_deaths")) %>% 
     dplyr::select(Study, followup, N, events) %>%
@@ -256,6 +256,7 @@ mymetarate <- function(df, outcome) {
   
   tibble::tibble(method = c("Fixed effect", "Random effects"),
                  rate = c(meta_result$TE.common, meta_result$TE.random),
+                 se = c(meta_result$seTE.fixed, meta_result$seTE.random),
                  lower_ci = c(meta_result$lower.common, meta_result$lower.random),
                  upper_ci = c(meta_result$upper.common, meta_result$upper.random),
                  I2 = rep(meta_result$I2, 2)) %>%
@@ -265,37 +266,148 @@ mymetarate <- function(df, outcome) {
 ```
 
 ```{r}
-df_metarate <- c("HTNC", "HTNU", "HTNE") %>%
+df_metarate_short <- c("HTNC", "HTNU", "HTNE") %>%
   setNames(., .) %>%
-  purrr::map_df(~mymetarate(df_incidence, .x), .id = "type") %>%
+  purrr::map_df(~mymetarate(df_incidence %>% dplyr::filter(followup <= 1), .x), .id = "type") %>%
   dplyr::filter(method == "Random effects") %>%
   dplyr::select(-method) %>%
-  dplyr::mutate(type = factor(type, levels = c("HTNC", "HTNU", "HTNE"))) %>%
-  dplyr::mutate(type = forcats::fct_recode(type,
-                                           "Hypertensive crisis" = "HTNC",
-                                           "Hypertensive urgency" = "HTNU",
-                                           "Hypertensive emergency" = "HTNE"))
+  dplyr::mutate(study = "Overall")
 ```
 
 ```{r}
-df_metarate %>% knitr::kable()
-df_rate
+df_metarate_short %>% knitr::kable()
 ```
+
+```{r}
+df_metarate_long <- c("HTNC", "HTNU", "HTNE") %>%
+  setNames(., .) %>%
+  purrr::map_df(~mymetarate(df_incidence %>% dplyr::filter(followup > 1), .x), .id = "type") %>%
+  dplyr::filter(method == "Random effects") %>%
+  dplyr::select(-method) %>%
+  dplyr::mutate(study = "Overall")
+```
+
+```{r}
+df_metarate_long %>% knitr::kable()
+```
+
+
+## Compare incidence differences
+
+```{r}
+ztest <- function(event_a, event_b) {
+  rate_diff <- abs(event_a[["rate"]] - event_b[["rate"]])
+  se_diff <- sqrt(event_a[["se"]]^2 + event_b[["se"]]^2)
+  z_stat <- rate_diff / se_diff
+  2 * (1 - pnorm(z_stat))
+}
+```
+
+```{r}
+c_htnc_short <- df_metarate_short %>% dplyr::filter(type == "HTNC") %>% dplyr::select(rate, se)
+c_htnc_long <- df_metarate_long %>% dplyr::filter(type == "HTNC") %>% dplyr::select(rate, se)
+c_htnu_long <- df_metarate_long %>% dplyr::filter(type == "HTNU") %>% dplyr::select(rate, se)
+c_htne_long <- df_metarate_long %>% dplyr::filter(type == "HTNE") %>% dplyr::select(rate, se)
+```
+
+```{r}
+ztest(c_htnc_short, c_htne)
+```
+
+
+```{r}
+ztest(c_htnc, c_htne)
+```
+
+```{r}
+ztest(c_htnc, c_htne)
+```
+
+```{r}
+ztest(c_htnu, c_htne)
+```
+
 
 ## Plot
 
 ```{r}
-{ ggplot2::ggplot(df_metarate, ggplot2::aes(x = forcats::fct_rev(type), y = rate)) +
-    ggplot2::geom_jitter(data = df_rate, size = 4, width = 0.3, alpha = 0.4, stroke=NA) +
-    ggplot2::geom_point(size = 8, shape = 18) +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = lower_ci, ymax = upper_ci), width = 0.1, size = 0.5) +
-    ggplot2::coord_flip() +
-    ggplot2::scale_x_discrete(name = NULL, expand = c(0, 0.4)) +
-    ggplot2::scale_y_continuous(name = "Annual mortality rate (95% CI)",
-                                expand = c(0, 0),
-                                breaks = seq(0, 1, 0.1),
-                                limits = c(0, 0.42)) } %>%
-  ggplot2::ggsave(filename = "cache/incidence.png", width = 8, height = 6, dpi = 300)
+incplot <- function(df_plot, lab = "Annual mortality rate (95% CI)", clip = c(0, 0.4)) {
+  forestplot::forestplot(labeltext = rbind(c("Study", "Incidence", "Events", "Person time"),
+                                           cbind(df_plot$study %>% as.character(),
+                                                 df_plot$label,
+                                                 ifelse(is.na(df_plot$event), "", sprintf("%4d", df_plot$event)),
+                                                 ifelse(is.na(df_plot$time), "", sprintf("%.1f", df_plot$time)))),
+                         mean = c(NA, df_plot$rate),
+                         lower = c(NA, df_plot$lower_ci),
+                         upper = c(NA, df_plot$upper_ci),
+                         align = c("l", "l", "r", "r"),
+                         graph.pos = 3,
+                         title = "",
+                         xlog = FALSE,
+                         xlab = lab,
+                         is.summary = c(rep(FALSE, nrow(df_plot)), TRUE),
+                         txt_gp = forestplot::fpTxtGp(label = grid::gpar(cex = 1.25),
+                                                      ticks = grid::gpar(cex = 1.1),
+                                                      xlab = grid::gpar(cex = 1.2),
+                                                      title = grid::gpar(cex = 1.2)),
+                         graphwidth = grid::unit(4, "cm"),
+                         xticks = seq(0, max(clip), 0.1),
+                         clip = clip,
+                         zero = 0,
+                         lineheight = grid::unit(10, "mm"),
+                         boxsize = 0.15,
+                         colgap = grid::unit(4, "mm"),
+                         lwd.ci = 1) %>%
+    print() %>% 
+    grid::grid.grabExpr()
+}
 ```
 
-<img src = "cache/incidence.png" />
+```{r}
+dplyr::bind_rows(df_rate, df_metarate) %>%
+  dplyr::filter(type == "HTNC") %>%
+  dplyr::mutate(label = dplyr::case_when(study != "Overall" ~ glue::glue("{sprintf('%.2f', rate)}"),
+                                         TRUE ~ glue::glue("{sprintf('%.2f', rate)} ({sprintf('%.2f', lower_ci)}-{sprintf('%.2f', upper_ci)})"))) %>% 
+  incplot(clip = c(0, 0.4)) %>%
+  ggplot2::ggsave("cache/incidence_htnc.png",
+                  plot = .,
+                  width = 10,
+                  height = 9,
+                  unit = "in",
+                  dpi = 300)
+```
+
+
+<img src = "cache/incidence_htnc.png" />
+
+```{r}
+dplyr::bind_rows(df_rate, df_metarate) %>%
+  dplyr::filter(type == "HTNU") %>%
+  dplyr::mutate(label = dplyr::case_when(study != "Overall" ~ glue::glue("{sprintf('%.2f', rate)}"),
+                                         TRUE ~ glue::glue("{sprintf('%.2f', rate)} ({sprintf('%.2f', lower_ci)}-{sprintf('%.2f', upper_ci)})"))) %>% 
+  incplot(clip = c(0, 0.4)) %>%
+  ggplot2::ggsave("cache/incidence_htnu.png",
+                  plot = .,
+                  width = 10,
+                  height = 3,
+                  unit = "in",
+                  dpi = 300)
+```
+
+<img src = "cache/incidence_htnu.png" />
+
+```{r}
+dplyr::bind_rows(df_rate, df_metarate) %>%
+  dplyr::filter(type == "HTNE") %>%
+  dplyr::mutate(label = dplyr::case_when(study != "Overall" ~ glue::glue("{sprintf('%.2f', rate)}"),
+                                         TRUE ~ glue::glue("{sprintf('%.2f', rate)} ({sprintf('%.2f', lower_ci)}-{sprintf('%.2f', upper_ci)})"))) %>% 
+  incplot(clip = c(0, 0.4)) %>%
+  ggplot2::ggsave("cache/incidence_htne.png",
+                  plot = .,
+                  width = 10,
+                  height = 4,
+                  unit = "in",
+                  dpi = 300)
+```
+
+<img src = "cache/incidence_htne.png" />
